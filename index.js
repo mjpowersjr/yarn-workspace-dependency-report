@@ -41,7 +41,12 @@ async function runCommand(args, opts = {}) {
 
 function getDependencies(source) {
     const packageJsonPath = path.normalize(path.join(source, 'package.json'));
-    const packageJson = require(packageJsonPath)
+    let packageJson = {};
+    try {
+        packageJson = require(packageJsonPath)
+    } catch(e) {
+        console.warn(e);
+    }
     return packageJson;
 }
 
@@ -73,17 +78,49 @@ function generateVersionData(data, dependencyType) {
     return results;
 }
 
+const dependencyTypes = ['dependencies', 'devDependencies', 'peerDependencies'];
+
 function generateReport(data) {
 
     const report = {};
-    const dependencyTypes = ['dependencies', 'devDependencies', 'peerDependencies'];
     for (const dependencyType of dependencyTypes) {
         const versionData = generateVersionData(data, dependencyType);
 
         report[dependencyType] = versionData;
     }
 
+    report['mergedDependencies'] = generatedMergedVersionData(data);
+
     return report;
+}
+
+
+function generatedMergedVersionData(data) {
+    const mergedType = 'mergedDependencies';
+    // generate merged dependency report. Sometimes package version drift between
+    // workspaces that have a mix of devDependencies & dependencies for the same
+    // package can cause conflicts.
+
+    let mergedData = {};
+
+    for (const packageName in data) {
+        for (const dependencyType of dependencyTypes) {
+            const dependencies = data[packageName][dependencyType] || {};
+            if (! mergedData[packageName]) {
+                mergedData[packageName] = {
+                    [mergedType]: {},
+                }
+            }
+            mergedData[packageName][mergedType] = {
+                ...mergedData[packageName][mergedType],
+                ...dependencies
+            };
+        }
+    }
+       
+    const versionData = generateVersionData(mergedData, mergedType);
+
+    return versionData;
 }
 
 async function exportToExcel(data, filename) {
@@ -158,7 +195,7 @@ async function main(props) {
         const rootPackageName = 'root:' + path.basename(rootPath);
         try {
             results[rootPackageName] = getDependencies(rootPath);
-        } catch(e) {
+        } catch (e) {
 
         }
 
