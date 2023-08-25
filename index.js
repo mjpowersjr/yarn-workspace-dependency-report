@@ -189,6 +189,7 @@ async function main(props) {
             packageNames = await getPackageNames(packagesPath);
         } catch (e) {
             packageNames = [];
+            console.warn(`skipping packages ${packagesPath} - ${e}`);
         }
 
         // monorepo's can have root/global deps
@@ -196,7 +197,7 @@ async function main(props) {
         try {
             results[rootPackageName] = getDependencies(rootPath);
         } catch (e) {
-
+            console.warn(`skipping repo ${rootPackageName} - ${e}`);
         }
 
         for (let i = 0; i < packageNames.length; i++) {
@@ -217,7 +218,8 @@ async function main(props) {
 
     await exportToExcel(report, reportFilename);
 
-    console.log(report);
+    console.log(Object.keys(report).map((it) => `* ${it}`).join(`\n`));
+    console.log('processed ' + Object.keys(report).length + ' packages.');
 }
 
 
